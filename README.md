@@ -38,8 +38,22 @@ docker compose up -d --build
 The container listens on port 8000 (published as 8101). Amazon only talks HTTPS on port 443,
 so put a reverse proxy with a trusted certificate in front and forward only the path `/alexa`.
 
-Home Assistant only shows entities to the MCP server that are exposed to Assist. Expose the
-sensors you want to ask about and list their topics in `HOUSE_TOPICS`.
+Home Assistant needs the "Model Context Protocol Server" integration (Assist API). It only
+shows entities that are exposed to Assist; expose the sensors you want to ask about and list
+their topics in `HOUSE_TOPICS`.
+
+## Layout
+
+| Module | Purpose |
+|---|---|
+| `bridge/app.py` | FastAPI routes `/alexa` and `/health` |
+| `bridge/config.py` | settings from the environment |
+| `bridge/skill.py` | Alexa protocol: request checks, routing by skill id, answer time window |
+| `bridge/conversation.py` | per-Echo history and the system prompt |
+| `bridge/tools.py` | MCP client and the Jarvis tools |
+| `bridge/jarvis.py` | LiteLLM tool-calling loop |
+| `bridge/claude.py` | Claude Code CLI call |
+| `bridge/speech.py` | speakable text and late answers through Home Assistant |
 
 ## Creating the skills (Alexa Developer Console)
 
