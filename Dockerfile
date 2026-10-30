@@ -9,7 +9,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py .
+COPY bridge ./bridge
 
 # claude keeps its sessions under $HOME/.claude, --resume needs them.
 RUN useradd -m -u 1000 bridge
@@ -17,4 +17,4 @@ USER bridge
 ENV HOME=/home/bridge PYTHONUNBUFFERED=1
 
 EXPOSE 8000
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "bridge.app:app", "--host", "0.0.0.0", "--port", "8000"]
