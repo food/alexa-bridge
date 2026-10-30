@@ -1,0 +1,135 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "jarvis",
+      "intents": [
+        {
+          "name": "QueryIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "Anything"
+            }
+          ],
+          "samples": [
+            "{query}",
+            "ob {query}"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "name": "Anything",
+          "values": [
+            {
+              "name": {
+                "value": "wetter"
+              }
+            },
+            {
+              "name": {
+                "value": "wie hoch ist der eiffelturm"
+              }
+            },
+            {
+              "name": {
+                "value": "was ist die hauptstadt von australien"
+              }
+            },
+            {
+              "name": {
+                "value": "erzähl mir einen witz"
+              }
+            },
+            {
+              "name": {
+                "value": "wie lange muss ein ei kochen"
+              }
+            },
+            {
+              "name": {
+                "value": "wer hat die relativitätstheorie erfunden und wann war das"
+              }
+            },
+            {
+              "name": {
+                "value": "was kann ich heute abend mit den kindern kochen wenn wir nur nudeln und tomaten haben"
+              }
+            },
+            {
+              "name": {
+                "value": "warum ist der himmel blau"
+              }
+            },
+            {
+              "name": {
+                "value": "rechne siebzehn mal dreiundzwanzig"
+              }
+            },
+            {
+              "name": {
+                "value": "übersetze guten morgen ins griechische"
+              }
+            },
+            {
+              "name": {
+                "value": "was steht in meinem gedächtnis über die solaranlage"
+              }
+            },
+            {
+              "name": {
+                "value": "wie viele kalorien hat eine banane"
+              }
+            },
+            {
+              "name": {
+                "value": "was war gestern in den nachrichten"
+              }
+            },
+            {
+              "name": {
+                "value": "gib mir eine idee für ein geburtstagsgeschenk"
+              }
+            },
+            {
+              "name": {
+                "value": "es morgen regnet"
+              }
+            },
+            {
+              "name": {
+                "value": "wann geht heute die sonne unter"
+              }
+            },
+            {
+              "name": {
+                "value": "wie spät ist es in new york"
+              }
+            },
+            {
+              "name": {
+                "value": "erkläre mir kurz wie eine wärmepumpe funktioniert"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
