@@ -1,0 +1,11 @@
+services:
+  alexa-bridge:
+    build: .
+    container_name: alexa-bridge
+    ports:
+      - "8101:8000"
+    environment:
+      - TZ=Europe/Berlin
+    # SKILL_JARVIS, SKILL_CLAUDE, HA_TOKEN, MEMORY_TOKEN, CLAUDE_CODE_OAUTH_TOKEN etc., see .env.example
+    env_file: .env
+    restart: unless-stopped
