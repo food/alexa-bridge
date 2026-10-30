@@ -1,7 +1,9 @@
 """Self-check: request checks, routing by skill id, tools, late answers through Home Assistant.
 python test_app.py"""
+import importlib
 import json
 import os
+import subprocess
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -9,24 +11,23 @@ os.environ["SKILL_JARVIS"] = "amzn1.ask.skill.jarvis"
 os.environ["SKILL_CLAUDE"] = "amzn1.ask.skill.claude"
 os.environ["ANSWER_DEADLINE"] = "0.2"
 
-import importlib  # noqa: E402
-
+import requests  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
 
-import app  # noqa: E402
+from bridge import claude, config, conversation, jarvis, skill, speech, tools  # noqa: E402
 
 # --- an empty skill id in .env must not enable a skill
 os.environ["SKILL_JARVIS"] = ""
-assert "" not in importlib.reload(app).SKILLS
+assert "" not in importlib.reload(config).SKILLS
 os.environ["SKILL_JARVIS"] = "amzn1.ask.skill.jarvis"
-importlib.reload(app)
+importlib.reload(config)
 
-app.verifier.verify = lambda headers, body, env: None
+skill.verifier.verify = lambda headers, body, env: None
 spoken = []
-app.announce = spoken.append
+speech.announce = spoken.append
 
 
-def request(skill, intent=None, query=None, new=True, age=0):
+def request(skill_id, intent=None, query=None, new=True, age=0):
     """Build a skill request in the format Amazon sends."""
     ts = (datetime.now(timezone.utc) - timedelta(seconds=age)).strftime("%Y-%m-%dT%H:%M:%SZ")
     req = {"type": "LaunchRequest", "timestamp": ts}
@@ -34,12 +35,12 @@ def request(skill, intent=None, query=None, new=True, age=0):
         req = {"type": "IntentRequest", "timestamp": ts,
                "intent": {"name": intent, "slots": {"query": {"name": "query", "value": query}}}}
     env = {"version": "1.0", "session": {"new": new},
-           "context": {"System": {"application": {"applicationId": skill}, "device": {"deviceId": "echo-1"}}},
+           "context": {"System": {"application": {"applicationId": skill_id}, "device": {"deviceId": "echo-1"}}},
            "request": req}
-    return app.handle({}, json.dumps(env).encode())
+    return skill.handle({}, json.dumps(env).encode())
 
 
-def speech(resp):
+def said(resp):
     """Spoken text of a skill response."""
     return resp["response"]["outputSpeech"]["text"]
 
@@ -54,10 +55,10 @@ def rejected(status, **kw):
 
 
 # --- foreign skills and stale requests do not get through
-assert rejected(403, skill="amzn1.ask.skill.other")
-assert rejected(400, skill="amzn1.ask.skill.jarvis", age=200)
+assert rejected(403, skill_id="amzn1.ask.skill.other")
+assert rejected(400, skill_id="amzn1.ask.skill.jarvis", age=200)
 try:
-    app.handle({}, b"{}")
+    skill.handle({}, b"{}")
     raise AssertionError("empty request must be rejected")
 except HTTPException as e:
     assert e.status_code == 400
@@ -78,11 +79,11 @@ class FakeResponse:
 
 
 # --- Claude gets Home Assistant read-only
-app.HA_TOKEN = "t"
+config.HA_TOKEN = "t"
 calls = []
-app.subprocess.run = lambda cmd, **kw: calls.append(cmd) or type(
+subprocess.run = lambda cmd, **kw: calls.append(cmd) or type(
     "Done", (), {"returncode": 0, "stdout": '{"session_id": "s", "result": "ok"}', "stderr": ""})()
-assert app.ask_claude("Wie hoch war die letzte Stromrechnung?", "echo-ha") == "ok"
+assert claude.ask("Wie hoch war die letzte Stromrechnung?", "echo-ha") == "ok"
 allowed = calls[0][calls[0].index("--allowedTools") + 1].split(",")
 assert "mcp__ha__homeassistant__GetLiveContext" in allowed
 assert not [t for t in allowed if "Hass" in t or t == "mcp__ha"], allowed
@@ -95,11 +96,11 @@ replies = [
                                       "function": {"name": "house_state", "arguments": "{}"}}]},
     {"content": "Der Abschlag ist am 1. November fällig."},
 ]
-app.TOOLS["house_state"] = lambda: "Abschlag fällig am: 2026-11-01"
-app.requests.post = lambda url, json=None, **kw: sent.append(json["messages"]) or FakeResponse(replies.pop(0))
-assert app.ask_jarvis("Wann ist der Abschlag fällig?", "echo-x") == "Der Abschlag ist am 1. November fällig."
+tools.TOOLS["house_state"] = lambda: "Abschlag fällig am: 2026-11-01"
+requests.post = lambda url, json=None, **kw: sent.append(json["messages"]) or FakeResponse(replies.pop(0))
+assert jarvis.ask("Wann ist der Abschlag fällig?", "echo-x") == "Der Abschlag ist am 1. November fällig."
 assert sent[1][-1] == {"role": "tool", "tool_call_id": "c1", "content": "Abschlag fällig am: 2026-11-01"}
-assert [m["role"] for m in app.history[("jarvis", "echo-x")][1]] == ["system", "user", "assistant"]
+assert [m["role"] for m in conversation.history[("jarvis", "echo-x")][1]] == ["system", "user", "assistant"]
 
 
 # --- MCP answers as SSE without charset: umlauts must survive
@@ -114,8 +115,8 @@ class FakeSse:
         """Server always answers 200."""
 
 
-app.requests.post = lambda *a, **kw: FakeSse()
-assert app.mcp_call("http://x/mcp", "t", "tool", {}) == "Küche"
+requests.post = lambda *a, **kw: FakeSse()
+assert tools.mcp_call("http://x/mcp", "t", "tool", {}) == "Küche"
 
 
 # --- waste calendar: only the next 21 days, sorted, across the turn of the year
@@ -129,38 +130,38 @@ years = []
 items = {2026: [{"Termin": ms(D("2026-12-20")), "Name": "Restmüll"}, {"Termin": ms(D("2026-12-29")), "Name": "Biotonne"},
                 {"Termin": ms(D("2026-12-01")), "Name": "Papier"}],
          2027: [{"Termin": ms(D("2027-01-05")), "Name": "Papier"}, {"Termin": ms(D("2027-02-01")), "Name": "Glas"}]}
-app.requests.get = lambda url, params=None, **kw: years.append(params["jahr"]) or type(
+requests.get = lambda url, params=None, **kw: years.append(params["jahr"]) or type(
     "R", (), {"raise_for_status": lambda self: None, "json": lambda self: {"d": items[params["jahr"]]}})()
-cal = app.waste_calendar(D("2026-12-20").date())
+cal = tools.waste_calendar(D("2026-12-20").date())
 assert years == [2026, 2027], years
 assert cal.splitlines()[1:] == ["Sonntag, 20.12.2026: Restmüll", "Dienstag, 29.12.2026: Biotonne",
                                 "Dienstag, 05.01.2027: Papier"], cal
 
 # --- a broken tool does not break the answer
-app.TOOLS["web_search"] = lambda query: 1 / 0
-assert "nicht erreichbar" in app.run_tool({"function": {"name": "web_search", "arguments": '{"query": "x"}'}})
+tools.TOOLS["web_search"] = lambda query: 1 / 0
+assert "nicht erreichbar" in tools.run({"function": {"name": "web_search", "arguments": '{"query": "x"}'}})
 
 # --- decimal point is spoken, dates and versions stay
-assert app.speakable("minus 1.12 Euro am 01.11.2026, Version 2.11.4") == \
+assert speech.speakable("minus 1.12 Euro am 01.11.2026, Version 2.11.4") == \
     "minus 1 Komma 12 Euro am 01.11.2026, Version 2.11.4"
-assert app.speakable("Insgesamt 166,00 Euro, Gas 95.00 Euro.") == "Insgesamt 166 Euro, Gas 95 Euro."
+assert speech.speakable("Insgesamt 166,00 Euro, Gas 95.00 Euro.") == "Insgesamt 166 Euro, Gas 95 Euro."
 
 # --- skill id picks the brain, decimal comma is spoken
-app.BRAINS["jarvis"] = lambda q, d: f"jarvis: {q} 1,6"
-app.BRAINS["claude"] = lambda q, d: f"claude: {q}"
+skill.BRAINS["jarvis"] = lambda q, d: f"jarvis: {q} 1,6"
+skill.BRAINS["claude"] = lambda q, d: f"claude: {q}"
 r = request("amzn1.ask.skill.jarvis", "QueryIntent", "wie spät ist es")
-assert speech(r) == "jarvis: wie spät ist es 1 Komma 6", speech(r)
+assert said(r) == "jarvis: wie spät ist es 1 Komma 6", said(r)
 assert r["response"]["shouldEndSession"] is True
-assert speech(request("amzn1.ask.skill.claude", "QueryIntent", "x", new=False)) == "claude: x"
+assert said(request("amzn1.ask.skill.claude", "QueryIntent", "x", new=False)) == "claude: x"
 
 # --- after "oeffne Jarvis" the microphone stays open
 assert request("amzn1.ask.skill.jarvis")["response"]["shouldEndSession"] is False
 assert request("amzn1.ask.skill.jarvis", "QueryIntent", "x", new=False)["response"]["shouldEndSession"] is False
 
 # --- too slow: "Moment" first, then the announcement through Home Assistant
-app.BRAINS["claude"] = lambda q, d: time.sleep(0.5) or "**spaete** Antwort"
+skill.BRAINS["claude"] = lambda q, d: time.sleep(0.5) or "**spaete** Antwort"
 r = request("amzn1.ask.skill.claude", "QueryIntent", "denk nach")
-assert speech(r).startswith("Moment") and r["response"]["shouldEndSession"] is True
+assert said(r).startswith("Moment") and r["response"]["shouldEndSession"] is True
 for _ in range(50):
     if spoken:
         break
