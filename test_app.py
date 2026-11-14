@@ -3,7 +3,6 @@ python test_app.py"""
 import importlib
 import json
 import os
-import subprocess
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -78,16 +77,40 @@ class FakeResponse:
         return {"choices": [{"message": self.message}]}
 
 
-# --- Claude gets Home Assistant read-only
+class RunnerResponse:
+    """claude-runner answer: the CLI's JSON or an HTTP error."""
+
+    def __init__(self, status, data=None):
+        self.status, self.data = status, data
+
+    def raise_for_status(self):
+        """Fail like requests does for 4xx/5xx."""
+        if self.status >= 400:
+            raise requests.HTTPError(f"{self.status}")
+
+    def json(self):
+        """Body as parsed JSON."""
+        return self.data
+
+
+# --- Claude gets Home Assistant read-only; a lost session is asked again without resume
 config.HA_TOKEN = "t"
-calls = []
-subprocess.run = lambda cmd, **kw: calls.append(cmd) or type(
-    "Done", (), {"returncode": 0, "stdout": '{"session_id": "s", "result": "ok"}', "stderr": ""})()
+config.CLAUDE_RUNNER_URL, config.CLAUDE_RUNNER_TOKEN = "http://runner:8769", "rt"
+calls, runner_replies = [], [RunnerResponse(200, {"session_id": "s1", "result": "ok"}),
+                             RunnerResponse(503, {"detail": "anthropic: exit 1: No conversation found"}),
+                             RunnerResponse(200, {"session_id": "s2", "result": "neu"})]
+real_post = requests.post
+requests.post = lambda url, **kw: calls.append((url, kw)) or runner_replies.pop(0)
 assert claude.ask("Wie hoch war die letzte Stromrechnung?", "echo-ha") == "ok"
-allowed = calls[0][calls[0].index("--allowedTools") + 1].split(",")
+url, kw = calls[0]
+assert url == "http://runner:8769/v1/run" and kw["headers"] == {"Authorization": "Bearer rt"}
+allowed = kw["json"]["allowed_tools"]
 assert "mcp__ha__homeassistant__GetLiveContext" in allowed
 assert not [t for t in allowed if "Hass" in t or t == "mcp__ha"], allowed
-assert '"ha"' in calls[0][calls[0].index("--mcp-config") + 1]
+assert "ha" in kw["json"]["mcp_servers"] and "resume" not in kw["json"]
+assert claude.ask("Und davor?", "echo-ha") == "neu"
+assert calls[1][1]["json"]["resume"] == "s1" and "resume" not in calls[2][1]["json"]
+requests.post = real_post
 
 # --- Jarvis calls tools, the result goes back to the model but not into the history
 sent = []
