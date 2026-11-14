@@ -4,6 +4,9 @@ import os
 LITELLM_URL = os.environ.get("LITELLM_URL", "http://localhost:4000")
 LITELLM_MODEL = os.environ.get("LITELLM_MODEL", "chat")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "sonnet")
+# Schlau runs on claude-runner (food/claude-runner), which holds the CLI and its login.
+CLAUDE_RUNNER_URL = os.environ.get("CLAUDE_RUNNER_URL", "http://localhost:8769")
+CLAUDE_RUNNER_TOKEN = os.environ.get("CLAUDE_RUNNER_TOKEN", "")
 MEMORY_URL = os.environ.get("MEMORY_URL", "http://localhost:8765/mcp")
 MEMORY_TOKEN = os.environ.get("MEMORY_TOKEN", "")
 HA_URL = os.environ.get("HA_URL", "http://homeassistant.local:8123")

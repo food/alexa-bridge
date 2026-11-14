@@ -7,8 +7,10 @@ Endpoint for two custom Alexa skills that pass free-form questions to your own m
   Home Assistant's MCP server), `waste_calendar` (pickup dates of the next 21 days from a
   c-trace municipality API) and `web_search` (snippets of the first SearXNG results).
   Usually answers in 1.5-3 s.
-- **"Alexa, frag Schlau ..."** -> headless Claude Code CLI with WebSearch, the memory MCP and
-  read-only Home Assistant tools (`GetLiveContext`, `todo get_items`). The invocation name is
+- **"Alexa, frag Schlau ..."** -> headless Claude Code with WebSearch, the memory MCP and
+  read-only Home Assistant tools (`GetLiveContext`, `todo get_items`), run on
+  [claude-runner](https://github.com/food/claude-runner) (`CLAUDE_RUNNER_URL`,
+  `CLAUDE_RUNNER_TOKEN`), which holds the CLI and its login. The invocation name is
   not "Claude" because German speech recognition hears "cloud".
 
 Jarvis is the fast path for everyday questions, Schlau the thorough one (10-20 s, the answer
@@ -52,7 +54,7 @@ their topics in `HOUSE_TOPICS`.
 | `bridge/conversation.py` | per-Echo history and the system prompt |
 | `bridge/tools.py` | MCP client and the Jarvis tools |
 | `bridge/jarvis.py` | LiteLLM tool-calling loop |
-| `bridge/claude.py` | Claude Code CLI call |
+| `bridge/claude.py` | Claude Code run through claude-runner |
 | `bridge/speech.py` | speakable text and late answers through Home Assistant |
 
 ## Creating the skills (Alexa Developer Console)
